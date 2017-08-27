@@ -21,7 +21,7 @@ def get_issue_page(url):
 
 def get_issues_by_place(place_url, max_pages=20):
     # Get all issues from the seeclickfix api within a specific place_url. max_pages is set to avoid huge huge datasets
-    # Returns a pandas dataframe of pages.
+    # Returns a pandas dataframe of issues.
     url = "http://seeclickfix.com/api/v2/issues?place_url=" + place_url  # define the initial api query
     dataset = get_issue_page(url)
 
@@ -32,17 +32,19 @@ def get_issues_by_place(place_url, max_pages=20):
     current_page = dataset.metadata[0]['pagination']['page']  # get current page
     next_url = dataset.metadata[0]['pagination']['next_page_url']  # get url for next page
 
+    issues = dataset.issues[0]  # extract issues as list of dicts
+
     # iterate through pages
     while current_page < total_pages:
         url = next_url
         df = get_issue_page(url)
         current_page = df.metadata[0]['pagination']['page']
         next_url = df.metadata[0]['pagination']['next_page_url']
-        dataset = pd.concat([dataset, df], ignore_index=True)  # concatenate
+        issues.extend(df.issues[0])  # extend the issues list
+        # dataset = pd.concat([dataset, df], ignore_index=True)  # concatenate  we don't need to keep doing this now that there is an issues list
 
-    # TODO unpack isues into a single dataframe
-    # TODO flatten issue data and return that istead of all of it
+    issuesdf = pd.DataFrame(issues)  # convert issues list back to a dataframe
 
-    return dataset
+    return issuesdf
 
 # TODO get issues by other geography: http://dev.seeclickfix.com/#geography
