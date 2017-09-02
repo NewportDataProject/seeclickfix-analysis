@@ -9,41 +9,49 @@ This code is licensed under the MIT License (c) 2017 by the Newport Data Project
 
 import urllib.request
 import pandas as pd
+import json
 
 
 def get_issue_page(url):
-    # GET a page of a dataset and convert to pandas
+    # GET a page of a dataset and convert to json object
     rawdata = urllib.request.urlopen(url).read()  # GET the data
-    data = "[" + str(rawdata, 'utf-8') + "]"  # convert from bytestring to json array string
-    df = pd.read_json(data, typ='frame', orient='columns', convert_dates=True)  # convert to pandas
-    return df
+    data = json.loads(rawdata)
+    return data
 
 
 def get_issues_by_place(place_url, max_pages=20):
     # Get all issues from the seeclickfix api within a specific place_url. max_pages is set to avoid huge huge datasets
-    # Returns a pandas dataframe of issues.
+    # Returns a flattened pandas dataframe of issues.
     url = "http://seeclickfix.com/api/v2/issues?place_url=" + place_url  # define the initial api query
-    dataset = get_issue_page(url)
 
-    total_pages = dataset.metadata[0]['pagination']['pages']  # get total number of pages in the dataset
+    json_response = get_issue_page(url)
+    total_pages = json_response['metadata']['pagination']['pages']
+
+    # dataset = get_issue_page(url)
+    # total_pages = dataset.metadata[0]['pagination']['pages']  # get total number of pages in the dataset
     if total_pages > max_pages:
         total_pages = max_pages  # enforce max page limit
 
-    current_page = dataset.metadata[0]['pagination']['page']  # get current page
-    next_url = dataset.metadata[0]['pagination']['next_page_url']  # get url for next page
+    current_page = json_response['metadata']['pagination']['page']  # get current page
+    next_url = json_response['metadata']['pagination']['next_page_url']  # get url for next page
 
-    issues = dataset.issues[0]  # extract issues as list of dicts
+    issues = json_response['issues']
 
     # iterate through pages
     while current_page < total_pages:
         url = next_url
-        df = get_issue_page(url)
-        current_page = df.metadata[0]['pagination']['page']
-        next_url = df.metadata[0]['pagination']['next_page_url']
-        issues.extend(df.issues[0])  # extend the issues list
-        # dataset = pd.concat([dataset, df], ignore_index=True)  # concatenate  we don't need to keep doing this now that there is an issues list
+        data = get_issue_page(url)
+        current_page = data['metadata']['pagination']['page']
+        next_url = data['metadata']['pagination']['next_page_url']
+        issues.extend(data['issues'])  # extend the issues
 
-    issuesdf = pd.DataFrame(issues)  # convert issues list back to a dataframe
+    issuesdf = pd.io.json.json_normalize(issues)  # flatten the issues
+
+    # convert date columns to datetime objects
+    date_cols = ['acknowledged_at', 'closed_at',
+                 'created_at', 'reopened_at', 'updated_at']  # list date columns
+    for col in date_cols:
+        issuesdf[col] = pd.to_datetime(issuesdf[col])
 
     return issuesdf
 
