@@ -19,10 +19,12 @@ def get_issue_page(url):
     return data
 
 
-def get_issues_by_place(place_url, max_pages=20):
+def get_issues_by_place(place_url, max_pages=20, archived=False):
     # Get all issues from the seeclickfix api within a specific place_url. max_pages is set to avoid huge huge datasets
-    # Returns a flattened pandas dataframe of issues.
-    url = "http://seeclickfix.com/api/v2/issues?place_url=" + place_url  # define the initial api query
+    # Returns a flattened pandas dataframe of issues.  Don't pull archived data unless specified.
+    url = "http://seeclickfix.com/api/v2/issues?place_url=" + place_url # define the initial api query
+    if archived:
+        url = url + "&status=open,acknowledged,closed,archived"
 
     json_response = get_issue_page(url)
     total_pages = json_response['metadata']['pagination']['pages']
@@ -40,6 +42,7 @@ def get_issues_by_place(place_url, max_pages=20):
     # iterate through pages
     while current_page < total_pages:
         url = next_url
+        print("Getting page " + str(current_page) + " of " + str(total_pages))  # be verbose about where we are...
         data = get_issue_page(url)
         current_page = data['metadata']['pagination']['page']
         next_url = data['metadata']['pagination']['next_page_url']
